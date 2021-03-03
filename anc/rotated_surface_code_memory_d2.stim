@@ -1,0 +1,68 @@
+R 0
+R 1
+R 5
+R 6
+tick
+tick
+R 2
+R 3
+R 4
+tick
+H 2
+H 3
+H 4
+tick
+CZ 3 0
+CNOT 4 1
+tick
+CZ 3 1
+CNOT 4 6
+tick
+CNOT 2 0
+CZ 3 5
+tick
+CNOT 2 5
+CZ 3 6
+tick
+H 2
+H 3
+H 4
+tick
+M 2
+M 3
+M 4
+tick
+R 2
+R 3
+R 4
+tick
+H 2
+H 3
+H 4
+tick
+CZ 3 0
+CNOT 4 1
+tick
+CZ 3 1
+CNOT 4 6
+tick
+CNOT 2 0
+CZ 3 5
+tick
+CNOT 2 5
+CZ 3 6
+tick
+H 2
+H 3
+H 4
+tick
+M 2
+M 3
+M 4
+tick
+tick
+M 0
+M 1
+M 5
+M 6
+tick

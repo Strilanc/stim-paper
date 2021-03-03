@@ -1,0 +1,1 @@
+This repository contains the latex code for my paper "Stim: a fast stabilizer circuit simulator".
