@@ -839,7 +839,7 @@ For example:
 
 Noise channels are harder to test than Cliffords, because the behavior of noise channels isn't deterministic.
 I tested noise channels by creating tests that sampled circuits applying the noise channel to simple states.
-Then, statistical checks verify the consistency of the samples against independent definitions of noise channels from Cirq \cite{quantum_ai_team_and_collaborators_2020_4062499}.
+Then, statistical checks verified the consistency of the samples against independent definitions of noise channels from Cirq \cite{quantum_ai_team_and_collaborators_2020_4062499}.
 The \path{X_ERROR}/\path{Z_ERROR} transposition that I mentioned slipped through these tests because originally they only exercised the bulk sampling API (which was a natural choice due to needing many samples), not the single-sample interactive API.
 
 Tests are run with compiler optimizations enabled, but also run without compilation optimizations with address and memory sanitization checks enabled.
