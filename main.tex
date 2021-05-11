@@ -762,6 +762,7 @@ This is because, for the noise levels around 0.1\% that are most interesting to 
 
 Stim contains a lot of code that is very easy to get wrong.
 There are hundreds of opportunities for sign errors, transposition errors, substitution errors, and omissions that would go undetected without testing.
+For example, embarrassingly, version 1.0 had a transposition error where the effects of the \path{X_ERROR} and \path{Z_ERROR} noise channels were swapped when in \path{--repl} mode.
 
 To verify the behavior of the operations in Stim, they are redundantly specified and the redundancies are checked for consistency.
 Each Clifford operation is specified in at least three different ways.
@@ -833,6 +834,10 @@ For example:
         }
     }
 \end{cpp}
+
+Noise channels are harder to test than Cliffords, because the behavior of noise channels isn't deterministic.
+Noise channels are tested by simulating circuits that apply the noise channel to simple states, and performing statistical tests on the output samples which verify consistency against independent definitions of the same noise channel from Cirq \cite{quantum_ai_team_and_collaborators_2020_4062499}.
+The \path{X_ERROR}/\path{Z_ERROR} transposition that I mentioned slipped through these checks because originally this testing only exercised the bulk sampling API (which was a natural choice due to needing many samples), not the single-sample interactive API.
 
 Tests are run with compiler optimizations enabled, but also run without compilation optimizations with address and memory sanitization checks enabled.
 A continuous integration system verifies that the tests pass before allowing commits to be merged into the main branch.
