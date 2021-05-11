@@ -84,8 +84,8 @@ With no foreknowledge, Stim can analyze a distance 100 surface code circuit (20 
 Stim uses a stabilizer tableau representation, similar to Aaronson and Gottesman's CHP simulator, but with three main improvements.
 First, Stim improves the asymptotic complexity of deterministic measurement from quadratic to linear by tracking the {\em inverse} of the circuit's stabilizer tableau.
 Second, Stim improves the constant factors of the algorithm by using a cache-friendly data layout and 256 bit wide SIMD instructions.
-Third, Stim only uses expensive stabilizer tableau simulation for its first sample.
-Further samples are collected by using the first sample as a baseline for vectorized batches of Pauli frames propagating through the circuit.
+Third, Stim only uses expensive stabilizer tableau simulation to create an initial reference sample.
+Further samples are collected in bulk by using that sample as a reference for batches of Pauli frames propagating through the circuit.
 \end{abstract}
 
 \maketitle
@@ -116,81 +116,22 @@ There are several obstacles that make this difficult.
 \begin{figure}
     \centering
     \resizebox{\linewidth}{!}{
-        \includegraphics{assets/bench-surface.png}
-    }
-    \caption{
-        Delay until first sample on $d \times d \times d$ unrotated surface code memory circuits \cite{horsman2012latticesurgery}.
-        The intention of this benchmark is to highlight simulators that can take advantage of redundant structure in the surface code, such as the abundance of local stabilizers and deterministic measurements.
-        Based on the apparent scaling, it appears that none of the simulators are making much use of the structure of the surface code.
-        Stim scales comparatively well on this benchmark because Stim performs deterministic measurements in worst case linear time instead of quadratic time.
-    }
-    \label{fig:bench-surface}
-\end{figure}
-
-\begin{figure}
-    \centering
-    \resizebox{\linewidth}{!}{
         \includegraphics{assets/bench-surface-1000.png}
     }
     \caption{
         Delay until one thousandth sample on $d \times d \times d$ surface code memory circuits \cite{horsman2012latticesurgery}.
         The intention of this benchmark is to highlight simulators that can perform some sort of compilation or analysis that lowers the cost of taking multiple samples.
         Stim does particularly well on this benchmark, with timings almost identical to its time-to-first-sample.
-        This is because it uses its first sample as a reference for follow-up vectorized Pauli frame simulations, and the vectorized Pauli frame simulation is orders of magnitude faster.
+        This is because it uses its first sample as a reference for batches of hundreds or thousands of Pauli frame simulations that are updated in parallel using SIMD instructions.
         The per-sample performance of Qiskit's simulator also improves when collecting more than one sample.
     }
     \label{fig:bench-surface-1000}
 \end{figure}
 
-\begin{figure}
-    \centering
-    \resizebox{\linewidth}{!}{
-        \includegraphics{assets/bench-bacon.png}
-    }
-    \caption{
-        Delay until first sample on $d \times d \times d$ Bacon-Shor code memory circuits \cite{bacon2006operator}.
-        The intention of this benchmark is to contrast with the surface code benchmark, in that the Bacon-Shor code also has a lot of structure but doesn't have lots of deterministic measurements.
-        Note how Stim's apparent scaling on this benchmark looks more like the other simulators than it did in the surface code benchmark.
-    }
-    \label{fig:bench-bacon}
-\end{figure}
-
-\begin{figure}
-    \centering
-    \resizebox{\linewidth}{!}{
-        \includegraphics{assets/bench-random.png}
-    }
-    \caption{
-        Delay until first sample on random circuits.
-        The intention of this benchmark is to highlight simulators with good performance in circuits that lack much exploitable structure.
-        Each circuit is made up of $n$ qubits operated on for $n$ layers.
-        Each layer randomly applies an $H$, $S$, or $I$ gate to each qubit, then samples a random pairing of the qubits and applies a CNOT to each pair, then samples 5\% of the qubits to measure in a random basis.
-        At the end of the circuit, every qubit is measured in a random basis.
-        One effect I don't understand here is why Stim appears to be scaling differently from chp.
-    }
-    \label{fig:bench-random}
-\end{figure}
-
-\begin{figure}
-    \centering
-    \resizebox{\linewidth}{!}{
-        \includegraphics{assets/bench-distill.png}
-    }
-    \caption{
-        Delay until first sample on nested 7-to-1 S state distillation circuits \cite{fowler2012surfacecodereview}.
-        The intention of this benchmark is to highlight simulators that do well on circuits made up of nearly independent pieces.
-        For example, with 5 levels of distillation, there are initially 2401 independent pieces (each with 15 qubits) performing identical copies of the 7-to-1 distillation circuit \href{https://algassert.com/quirk\#circuit=\%7B\%22cols\%22\%3A\%5B\%5B\%22H\%22\%2C\%22H\%22\%2C\%22H\%22\%2C\%22H\%22\%2C\%22H\%22\%2C\%22H\%22\%2C\%22H\%22\%2C\%22H\%22\%2C\%22H\%22\%2C\%22H\%22\%2C\%22H\%22\%5D\%2C\%5B\%22Z\%22\%2C\%22Z\%5E\%C2\%BD\%22\%2C\%22Z\%5E\%C2\%BD\%22\%2C\%22Z\%5E\%C2\%BD\%22\%2C\%22Z\%5E\%C2\%BD\%22\%2C\%22Z\%5E\%C2\%BD\%22\%2C\%22Z\%5E\%C2\%BD\%22\%2C\%22Z\%5E\%C2\%BD\%22\%5D\%2C\%5B1\%2C1\%2C1\%2C1\%2C1\%2C1\%2C1\%2C1\%2C1\%2C1\%2C\%22\%E2\%80\%A2\%22\%2C\%22X\%22\%2C\%22X\%22\%2C\%22X\%22\%5D\%2C\%5B1\%2C1\%2C1\%2C1\%2C1\%2C1\%2C1\%2C1\%2C1\%2C\%22\%E2\%80\%A2\%22\%2C1\%2C\%22X\%22\%2C1\%2C\%22X\%22\%2C\%22X\%22\%5D\%2C\%5B1\%2C1\%2C1\%2C1\%2C1\%2C1\%2C1\%2C1\%2C\%22\%E2\%80\%A2\%22\%2C1\%2C1\%2C\%22X\%22\%2C\%22X\%22\%2C1\%2C\%22X\%22\%5D\%2C\%5B\%22\%E2\%80\%A2\%22\%2C1\%2C1\%2C1\%2C1\%2C1\%2C1\%2C1\%2C1\%2C1\%2C1\%2C1\%2C\%22X\%22\%2C\%22X\%22\%2C\%22X\%22\%5D\%2C\%5B1\%2C\%22\%5E\%3DA7\%22\%2C1\%2C1\%2C1\%2C1\%2C1\%2C1\%2C\%22inputA7\%22\%5D\%2C\%5B1\%2C1\%2C1\%2C1\%2C1\%2C1\%2C1\%2C1\%2C\%22H\%22\%2C\%22H\%22\%2C\%22H\%22\%2C\%22H\%22\%2C\%22H\%22\%2C\%22H\%22\%2C\%22H\%22\%5D\%2C\%5B1\%2C\%22Measure\%22\%2C\%22Measure\%22\%2C\%22Measure\%22\%2C\%22Measure\%22\%2C\%22Measure\%22\%2C\%22Measure\%22\%2C\%22Measure\%22\%2C\%22Measure\%22\%2C\%22Measure\%22\%2C\%22Measure\%22\%2C\%22Measure\%22\%2C\%22Measure\%22\%2C\%22Measure\%22\%2C\%22Measure\%22\%5D\%2C\%5B1\%2C\%22inputA7\%22\%2C1\%2C1\%2C1\%2C1\%2C1\%2C1\%2C\%22\%5E\%3DA7\%22\%5D\%2C\%5B1\%2C1\%2C1\%2C1\%2C1\%2C1\%2C1\%2C1\%2C\%22X\%22\%2C\%22X\%22\%2C\%22X\%22\%2C\%22\%E2\%80\%A2\%22\%5D\%2C\%5B\%22Z\%22\%2C1\%2C1\%2C1\%2C1\%2C1\%2C1\%2C1\%2C\%22X\%22\%2C1\%2C\%22X\%22\%2C1\%2C\%22\%E2\%80\%A2\%22\%5D\%2C\%5B\%22Z\%22\%2C1\%2C1\%2C1\%2C1\%2C1\%2C1\%2C1\%2C1\%2C\%22X\%22\%2C\%22X\%22\%2C1\%2C1\%2C\%22\%E2\%80\%A2\%22\%5D\%2C\%5B\%22Z\%22\%2C1\%2C1\%2C1\%2C1\%2C1\%2C1\%2C1\%2C\%22X\%22\%2C\%22X\%22\%2C1\%2C1\%2C1\%2C1\%2C\%22\%E2\%80\%A2\%22\%5D\%2C\%5B1\%2C1\%2C1\%2C1\%2C1\%2C1\%2C1\%2C1\%2C\%22Chance3\%22\%5D\%2C\%5B\%22Bloch\%22\%2C1\%2C1\%2C1\%2C1\%2C1\%2C1\%2C1\%2C\%22\%7C0\%E2\%9F\%A9\%E2\%9F\%A80\%7C\%22\%2C\%22\%7C0\%E2\%9F\%A9\%E2\%9F\%A80\%7C\%22\%2C\%22\%7C0\%E2\%9F\%A9\%E2\%9F\%A80\%7C\%22\%5D\%5D\%7D}{(view in Quirk)}.
-        Then the output qubits from each of these pieces are put into groups of seven and handed along to the next stage, which has 343 independent pieces.
-        This process continues until there is a single output qubit remaining.
-        graphsim does particularly well on this benchmark, due to the connected components of the graph state perfectly matching the independent pieces of the circuit.
-    }
-    \label{fig:bench-distill}
-\end{figure}
-
 First, if a circuit has a million gates, and your computer's clock speed is 2 gigahertz, then the simulator has a budget of 200 clock cycles per gate.
 That's a tight budget.
 
-Second, describing an arbitrary $n$-qubit stabilizer state takes at least $\frac{1}{2} n^2$ bits \cite{gross2006hudson,howmanystabilizers2021}.
+Second, describing an arbitrary $n$-qubit stabilizer state takes at least $\frac{1}{2} n^2$ bits \cite{gross2006hudson,karanjai2018contextuality,howmanystabilizers2021}.
 This means that, in the worst case, a general stabilizer simulator that works in an online fashion will need megabytes of information to track the state of a 15000 qubit system.
 Storing this amount of information is not a problem.
 The problem is repeatedly touching that information without blowing the budget on cache misses.
@@ -198,13 +139,12 @@ The problem is repeatedly touching that information without blowing the budget o
 Third, typically, simulating a Clifford gate has complexity $\Omega(n)$ where $n$ is the number of qubits in the circuit.
 Given the aforementioned cycle budget, the constant factor hiding behind that $\Omega$ has to be roughly 0.01 cycles.
 
-Fourth, the surface code is chock full of measurements.
-In most stabilizer simulators, measurement is the worst performing gate.
-Aaronson and Gottesman's\cite{aaronson2004chp} CHP simulator?
+Fourth, the surface code is chock full of measurements and, basically, historically, the cost of measurements in stabilizer simulators started at $\Theta(n^3)$ \cite{gottesman1997stabilizerformalism}, improved to $\Theta(n^2)$~\cite{aaronson2004chp}, and then stayed there.
+Aaronson and Gottesman's~\cite{aaronson2004chp} CHP simulator?
 Measurement takes $\Theta(n^2)$ time in the worst case.
-Anders and Briegel's\cite{anders2006fastgraphsim} graph state simulator?
+Anders and Briegel's~\cite{anders2006fastgraphsim} graph state simulator?
 Measurement takes $\Theta(n^2)$ time in the worst case.
-Bravyi et al's\cite{bravyi2019simulation} CH form simulator?
+Bravyi et al's~\cite{bravyi2019simulation} CH form simulator?
 Measurement takes $\Theta(n^2)$ time in the worst case.
 We can't afford $\Theta(n^2)$ time.
 
@@ -213,20 +153,35 @@ It contains magic state injections.
 This obstacle has actually been the subject of a lot of recent work \cite{bravyi2019simulation,bu2019efficient,huang2020feynman,huang2019approximate}.
 I'll be completely ignoring it in this paper.
 
+Sixth, when simulating an error correcting circuit, it's common to sample a circuit millions or even trillions of times.
+For example, going to large code distances can allow a lone half distance error mechanism to shine through the background haze of full distance errors.
+But logical errors become rare at large code distances, and so many samples have to be taken to see them.
+Based on discussions I've had with co-workers who have done these sorts of large scale simulations \cite{conversationmikeasutin}, the main bottleneck is not decoding the errors but rather (surprisingly) generating the samples.
+So it's not just the latency until the first sample that matters; the sustained bulk sampling rate is also important.
+
 With all those obstacles listed I should note that, of course, by using hardcoded knowledge about magic state distillation and the surface code, it's possible to make a specialized simulator that could solve my example case much faster than a general stabilizer circuit simulator.
 But my underlying motivation is one of exploration, and I would strongly prefer to create a tool whose performance and correctness doesn't require understanding the behavior of places I haven't been yet.
 So, in this paper, I present my failed attempt to reach my ridiculous goal.
 The result is a software tool I've named "Stim".
 Although Stim can't simulate a 15 thousand qubit surface code circuit with millions of gates in under a tenth of a second, it can at least get that job done in roughly ten seconds.
-Also, as I will explain, most of the execution time is spent on an initial analysis of the circuit.
-After the analysis is done (or bypassed), a sample (or a batch of hundreds of samples!) can be produced in a tenth of the time.
+Then, with that initial sample acquired, it can begin producing batches of hundreds of samples in a tenth of the time.
 
-Stim's stabilizer simulator makes two key improvements over previous stabilizer simulators.
-These improvements address obstacles (4) and (3).
-Obstacle (4) is addressed by making an algorithmic improvement that decreases the time complexity of {\em deterministic} measurements from quadratic to linear.
+Stim makes three key improvements over previous stabilizer simulators.
+These improvements address obstacle 4 (the measurement obstacle), obstacle 3 (the constant factor obstacle), and obstacle 6 (the mega sampling obstacle).
+
+The measurement obstacle is addressed by making an algorithmic improvement that decreases the time complexity of {\em deterministic} measurements from quadratic to linear.
 This is beneficial in contexts, such as the surface code, where a circuit has many measurements but those measurements are almost entirely deterministic.
-Obstacle (3) is partially addressed by using 256 bit wide AVX instructions in tight loops iterating over contiguous memory.
-For example, Stim multiplies Pauli terms 256 at a time using a phase accumulating loop whose body contains only 11 bitwise AVX operations (see \fig{pauli_mult_code}).
+
+The constant factor obstacle is addressed by using SIMD (Same Instruction Multiple Data) instructions in tight loops iterating over contiguous memory.
+Using SIMD is not a novel concept (e.g. Aaronson et al's CHP simulator \cite{aaronson2004chp} packs the bits from Pauli terms into bytes, which allows 8 to be operated on by each instruction) but it's technically challenging to implement well and Stim does it at larger register sizes than previous work.
+Specifically, Stim uses 256 bit wide Advanced Vector Extensions (AVX) \cite{wiki:Advanced_Vector_Extensions} and also I spent a lot of effort minimizing the number of operations in key loops.
+For example, a core operation for most gates is multiplying together strings of Pauli terms, which requires accumulating scalar factors from individual Pauli multiplications.
+I found a way to do this using only 11 bitwise operations per group of Paulis (see \fig{pauli_mult_code}).
+Modern Intel CPUs can apply 3 bitwise AVX operations per clock cycle \cite{intel-intrinsics-and}, and 256 is much larger than 11, suggesting that a budget of 0.01 cycles per qubit during a Clifford gate isn't quite as ridiculous as it seems.
+
+The mega sampling obstacle is addressed by including a Pauli frame simulator that uses SIMD instructions to operate on the state of hundreds of simulations in parallel.
+This amortizes the cost of cache misses and branch mispredictions and other performance killers.
+This is a simple enough idea, but it gives Stim an enormous advantage over previous work when bulk sampling (see \fig{bench-surface-1000}).
 
 This paper is divided into sections.
 In \sec{concepts}, I explain key background concepts that are needed in order to understand the simulation strategies being described.
@@ -264,12 +219,38 @@ In the xz encoding (and most others), two Paulis can be multiplied up to global 
 
 $$\texttt{encode\_xz}(P_1 P_2) = \texttt{encode\_xz}(P_1) \oplus \texttt{encode\_xz}(P_2) = (x_1 \oplus x_2, z_1 \oplus z_2)$$
 
-In Stim, Pauli products are represented by the \path{PauliString} class.
+In Stim, Pauli products are represented by the \path{stim::PauliString} class.
+
+\subsection{Stabilizer Generators}
+
+When a quantum state is in the +1 eigenstate of an operation, that operation is said to be a {\em stabilizer} of the state.
+For example: $+Z$ is a stabilizer of the computational basis state $|0\rangle$, $+Z$ is {\em not} a stabilizer of the computational basis state $|1\rangle$, $+X$ is a stabilizer of the superposed state $|0\rangle + |1\rangle$, and $-YY$ is a stabilizer of the entangled state $|00\rangle + |11\rangle$.
+Stabilizer operations that are Pauli products are of particular interest, as they form the basis of the {\em stabilizer formalism} \cite{gottesman1997stabilizerformalism} (easily one of the most important and foundational ideas in quantum error correction).
+In this paper, whenever I say "stabilizer" I always mean "Pauli product stabilizer".
+
+The stabilizers of a state form a group under multiplication.
+Let $A$ and $B$ be stabilizers of a state $|\psi\rangle$, meaning $A |\psi\rangle = |\psi\rangle = B |\psi\rangle$.
+$AB$ is also a stabilizer of $|\psi\rangle$, because $A B|\psi\rangle = A |\psi\rangle = |\psi\rangle$.
+
+The stabilizers of a state commute.
+Note that $A B|\psi\rangle = B A|\psi\rangle$, so $0 = (AB - BA) |\psi\rangle = [A, B] |\psi\rangle$.
+The commutator of $A$ and $B$ must project $|\psi\rangle$ to the zero vector.
+The commutators of Pauli products are always scalar factors of Pauli products, where only the scalar factor can affect the length of $|\psi\rangle$, so it must be the case that the scalar factor is zero, meaning $[A, B] = 0$ (i.e. $A$ and $B$ commute).
+
+If you start with the set of all stabilizers of a state, and iteratively remove stabilizers that can be formed by multiplying together other stabilizers, you are left with a small set of stabilizers referred to as {\em generators} of the state's stabilizer group.
+For example, $|000\rangle$ has seven stabilizers (not counting the vacuous identity stabilizer) and these stabilizers can be generated by $ZII$, $IZI$, and $IIZ$.
+An $n$ qubit state will have at most $n$ stabilizer generators.
+An $n$ qubit state with exactly $n$ stabilizer generators is a {\em stabilizer state}.
+
 
 \subsection{Stabilizer Tableaus}
 
-A stabilizer tableau is a representation of a Clifford operation that stores how the Clifford operation conjugates generators of the Pauli group.
-In this paper, I use the generators $X_q$ and $Z_q$ for each qubit $q$.
+A {\em Clifford operation} is a unitary quantum operation that conjugates Pauli products into Pauli products.
+$C$ is Clifford if, for all pauli products $P$, it is the case that $C^\dagger P C$ is also a Pauli product.
+In fact, a Clifford operation can be uniquely identified (up to global phase) by how it conjugates Pauli products.
+
+A stabilizer tableau is a representation of a Clifford operation that simply directly stores how the Clifford operation conjugates each generator of the Pauli group.
+In this paper, I use the generators $X_q$ and $Z_q$ for each qubit $q$ that the operation touches.
 
 For example, here is a stabilizer tableau for the Controlled Y gate $C_Y$:
 
@@ -295,7 +276,12 @@ The column for $X_a$ must commute with the column for $X_b$ and the column for $
 Also, a valid tableau doesn't have missing columns.
 If there is a row for qubit $q$, there must be columns for the generators $X_q$ and $Z_q$.
 
-In Stim, stabilizer tableaus are represented by the class \path{Tableau}.
+Storing an $n$-qubit stabilizer tableau uses $4n^2 + O(n)$ bits.
+There are $2n$ generator outputs to store, each output has $n$ Pauli terms, and each Pauli term is xz-encoded into two bits.
+
+In Stim, stabilizer tableaus are represented by the class \path{stim::Tableau}.
+Storing the stabilizer tableau is Stim's dominant space cost.
+All other space costs are linear in the number of qubits.
 
 \subsubsection{Conjugating a Pauli Product by a Tableau}
 
@@ -314,8 +300,8 @@ If the tableau covers $m$ qubits, and the Pauli product has $c$ qubits in common
 Therefore, the complexity of inplace conjugation of an $n$ qubit Pauli product by an $m$ qubit stabilizer tableau with $c$ qubits in common is $O(mc)$ with no dependence on $n$ (this assumes that it is not necessary to determine which qubits are in common).
 Note that $O(mc) \subseteq O(m^2)$.
 
-In Stim, the method \path{Tableau::apply_within} performs inplace conjugation of a Pauli product by a tableau.
-Stim also supports out of place conjugation via the \path{Tableau::operator()} operator.
+In Stim, the method \path{stim::Tableau::apply_within} performs inplace conjugation of a Pauli product by a tableau.
+Stim also supports out of place conjugation via the \path{stim::Tableau::operator()} operator.
 
 \subsubsection{Composing Tableaus}
 
@@ -332,8 +318,8 @@ The cost of conjugating by $B$ is $O(m)$, since the generator has 1 qubit in com
 The cost of then conjugating by $A$ is $O(Nm)$, since the output from $B$ has at most $m$ qubits in common with $A$.
 Therefore the complexity of inplace prepending is the same as inplace appending: $O(N m^2)$.
 
-In Stim, inplace composition is implemented by the \path{Tableau::inplace_scatter_append} method and the \path{Tableau::inplace_scatter_prepend} method.
-There are also many specialized optimized methods for inplace composition of common gates, such as \path{Tableau::prepend_SQRT_Z}.
+In Stim, inplace composition is implemented by the \path{stim::Tableau::inplace_scatter_append} method and the \path{stim::Tableau::inplace_scatter_prepend} method.
+There are also many specialized optimized methods for inplace composition of common gates, such as \path{stim::Tableau::prepend_SQRT_Z}.
 
 \subsubsection{Inverting Tableaus}
 
@@ -394,7 +380,7 @@ One possible way to avoid this cost is to associate a pair of signs with every r
 When appending and prepending operations into a tableau, the row signs can be updated along with the column signs at no additional cost (asymptotically speaking).
 However, for the use case in this paper, only the column signs are needed so I won't bother with including the row signs.
 
-In Stim, the inverse of a tableau can be computed using the \path{Tableau::inverse} method.
+In Stim, the inverse of a tableau can be computed using the \path{stim::Tableau::inverse} method.
 
 \subsection{Pauli Frames}
 
@@ -405,7 +391,7 @@ In effect, a Pauli frame is just a Pauli product where the global phase is ignor
 \subsubsection{Tracking Noise}
 
 When simulating a noisy stabilizer circuit, where the noise is composed of probabilistic Pauli operations, it is not necessary to directly apply the noise to the simulated qubits.
-Instead, the noise can be accumulated into a Pauli frame stored alongside the simulation.
+Instead, the noise can be accumulated into a Pauli frame stored alongside the simulation \cite{knill2005quantum}.
 As the simulation progresses, applying gates to the qubits, the Pauli frame is kept synchronized with the simulation by conjugating the frame's contents by the same gates.
 
 When the simulation reports the measurement result from a qubit $q$, and the Pauli frame is storing an $X$ or $Y$ update for $q$, the measurement result is intercepted and inverted before being forwarded along.
@@ -418,56 +404,50 @@ This works even without access to the internal implementation details of that si
 
 Pauli frames can also track corrective Pauli operations, so that those operations don't have to be applied to the underlying qubits.
 For example, this can be used to augment a black box non-adaptive stabilizer simulator into a simulator that supports adaptive Pauli operations that depend on previous measurement results.
-This even works if the simulator is replaced by a physical quantum computer.
+This even works if the simulator is replaced by a physical quantum computer \cite{ware2017experimental}.
 
-The ability to track corrections from the outside using a Pauli frame is a key technique in quantum error correction.
-It is the fundamental reason why stabilizer codes don't require just-in-time decoding of errors.
-Any corrections that were needed can be backdated into the Pauli frame at the appropriate time, and propagated forward through the circuit to the current time toggling measurements as appropriate.
+The ability to track corrections from the outside using a Pauli frame is a key technique in quantum error correction \cite{knill2005quantum}.
+It is the fundamental reason why just-in-time decoding of errors isn't needed for stabilizer codes like the surface code \cite{fowler2012surfacecodereview}.
+Any corrections that are needed can be backdated into the Pauli frame at the appropriate time, and propagated forward through the circuit to the current time by toggling recorded measurements as dictated by the Pauli frame.
 
 \section{Pauli Frame Simulation}
 \label{sec:framesim}
 
-A Pauli frame simulator is a stabilizer circuit simulator that only requires O(1) time per gate.
-However, there is a catch.
-The Pauli frame simulator needs to be seeded with a reference sample from the circuit.
+A Pauli frame simulator works by propagating a Pauli frame through a circuit.
+Clifford operations conjugate the frame, noise processes multiply Paulis into the frame, and collapsing operations randomize parts of the frame.
+The benefit of Pauli frame simulation is that the frame only takes $O(n)$ bits to store and $O(1)$ time to update per gate.
+The downside of Pauli frame simulation is that it doesn't tell you measurement results; it tells you whether or not measurements {\em were flipped}.
+To convert this information into actual measurement results, you need a noiseless reference sample to diff against.
 
-In a lot of cases, it's easy to acquire a reference sample.
-For example, in surface code memory experiments, a valid reference sample is one where all measurement results are zero.
-Unfortunately, in general, a more expensive simulation method (such as a stabilizer tableau simulation or a graph state simulation) has to be used to get the reference sample.
-The need for a reference sample is particularly problematic in circuits with Clifford feedback.
-For these circuits, a different reference sample is needed for each different combination of feedback Clifford operations that is encountered.
+In a Pauli frame simulation, noise processes must be Pauli channels (i.e. equivalent to sampling a Pauli product from a probability distribution and applying the sampled product to the system's state).
+For example, dephasing and depolarization are Pauli channels but relaxation to the ground state and leaking outside the computational basis aren't.
+A Pauli frame simulator simulates a Pauli channel noise process by sampling a Pauli product from the Pauli product distribution corresponding to the noise process and multiplying the sampled Pauli product into the Pauli frame.
 
-Regardless, once the reference sample is acquired, the Pauli frame simulator simply tracks how perturbations to the Pauli frame cause the current circuit execution to deviate from the reference sample.
-These perturbations come from two sources:
-physical noise and Heisenberg uncertainty.
-I've already discussed how physical noise can be tracked by a Pauli frame, so let's discuss uncertainty.
+Paulis can also be multiplied into the Pauli frame by collapsing operations (initializations, resets, and measurements).
+These operations introduce new stabilizers into the system.
+To force later measurements to have random results if they measure observables that anticommute with a newly introduced stabilizer, the stabilizer is multiplied into the Pauli frame with 50\% probability.
+In other words, after each initialization and reset and measurement, a \path{Z_ERROR(0.5)} is applied to the target qubit.
+Conveniently, inserting these random Z operations is equivalent to replacing the noiseless reference sample that is being used with another independent noiseless sample from the circuit.
+The random Z operations make all reference samples interchangeable and reusable.
 
-Heisenberg uncertainty comes into play when a qubit is initialized, measured, or reset.
-Because these operations anticommute with the qubit's X observable, they force it to be maximally uncertain.
-To emulate this uncertainty, a Z operation is multiplied into the Pauli frame with 50\% probability after every qubit initialization, every reset, and every measurement.
-
-To be a bit more rigorous, consider the set $S$ of all possible samples that a non-adaptive stabilizer circuit $C$ can produce.
-When sampling $C$, each element from $S$ is equally likely to be the result.
-Arbitrarily pick one of the possible samples and call it $r$.
-Then the set $G = \{s \oplus r | s \in S\}$ forms a group under the $\oplus$ operation (the operation that xors corresponding measurement bits together).
-When we choose to randomly insert a Z operation after a reset (or not), we are ultimately toggling some set of later measurements.
-Toggling this set of measurements will be an element of $G$.
-In fact, the set of random Z operations that I've described form a set of generators for $G$.
-By randomly picking which Z operations to insert or not, we're actually picking a random element from $G$.
-As long as we remember to xor $r$ back into the element of $G$ that we picked, we're sampling from the output distribution of $C$.
-
-Summarizing, a Pauli frame simulation works as follows:
+Putting all of the pieces together, a Pauli frame simulation works as follows.
+(Note: this summary will describe actions as if they were applied to one isolated Pauli frame.
+Stim uses SIMD operations to apply each action to multiple frames simultaneously.)
 
 \begin{enumerate}
-  \item A reference sample is collected from the target circuit using some other method.
-  \item The Pauli frame is initialized with a randomly chosen $I$ or $Z$ term on each qubit (from Heisenberg uncertainty).
+  \item A reference sample is collected from the target circuit, with all noise processes disabled, using some other method.
+  The reference sample can be used and reused as many times as needed.
+  \item A Pauli frame is initialized with a randomly chosen $I$ or $Z$ term on each qubit (due to initialization being a collapsing operation).
   \item The Pauli frame is advanced through the circuit.
   \begin{itemize}
       \item When the frame crosses a Clifford operation $C$, the frame undergoes the update $F \rightarrow C^{-1} F C$.
-      \item When the frame crosses a reset, the qubit's term in the frame is set to $I$ or $Z$, chosen randomly (from Heisenberg uncertainty).
-      \item When the frame crosses a measurement, the result $r_M \oplus x_q$ is reported where $r_M$ is the reference measurement result and $x_q$ is true if the Pauli frame has an $X$ or $Y$ term on the target qubit.
-      Also, a $Z$ operation on the qubit is multiplied into the frame with 50\% probability (from Heisenberg uncertainty).
+      \item When the frame crosses a reset, the qubit's term in the frame is set to the identity operation.
+      Then a $Z$ on the target qubit is multiplied into the frame with 50\% probability, because resets are collapsing operations.
+      \item When the frame crosses a Pauli error channel, a Pauli product is sampled from the error channel (usually the no-error identity operation is by far the most likely) and multiplied into the frame.
+      \item When the frame crosses a measurement, the result of that measurement (for the simulation run that the frame represents) is reported as $r_M \oplus x_q$ (where $r_M$ is the reference measurement result and $x_q$ is true if the Pauli frame has an $X$ or $Y$ term on the target qubit).
+      Then a $Z$ on the target qubit is multiplied into the frame with 50\% probability, because measurements are collapsing operations.
   \end{itemize}
+  \item If more samples of the circuit are needed, go to step 2. Otherwise stop.
 \end{enumerate}
 
 \section{Stabilizer Tableau Simulation}
@@ -550,12 +530,15 @@ Here are the steps used to perform a stabilizer tableau simulation:
     \end{itemize}
 \end{enumerate}
 
-The asymptotic complexity of this simulation is $O(ng + n^2r)$ where $n$ is the number of qubits, $g$ is the number of gates, and $r$ is the number of measurements (including measurements hidden inside resets) that have random results.
-This is an improvement over the complexity $O(ng + n^2m)$ from previous work, where $m$ is the number of all measurements including deterministic measurements.
+The asymptotic complexity of this simulation is $O(ng + nd + n^2r)$ where $n$ is the number of qubits, $g$ is the number of gates, $d$ is the number of measurements that have a deterministic result given previous measurements, and $r$ is the number of measurements that have random results.
+(Note: $m$ and $r$ also include contributions from operations such as resets, which implicitly perform a measurement as part of their implementation.)
+This is an improvement over the complexity $O(ng + n^2d + n^2r)$ from previous work.
 
-An example of a context where this improvement provides an asymptotic advantage is simulating a distance $d$ surface code circuit.
-Typically, such a circuit will have $\Theta(d^3)$ deterministic measurements, $\Theta(d^2)$ random measurements, and $\Theta(d^2)$ qubits.
-In this context, tracking the forward tableau results in a worst case simulation cost of $\Theta(d^5)$ whereas tracking the inverse tableau results in a worst case cost of $\Theta(d^4)$.
+An example of a context where this improvement provides an asymptotic advantage is simulating a distance $d$ surface code circuit for $d$ rounds.
+Typically, such a circuit will have $\Theta(d^2)$ qubits, $\Theta(d^2)$ deterministic measurements in each round, and $\Theta(d^2)$ random measurements in the first and last round.
+Simulating this circuit by tracking the forward tableau has a worst case simulation cost of $\Theta(d^7)$ whereas tracking the inverse tableau results in a worst case cost of $\Theta(d^6)$.
+(Interestingly, the $\Theta(d^6)$ cost comes entirely the random measurements in the first and last rounds.
+All of the intermediate rounds combined have a cost of $\Theta(d^5)$.)
 
 \section{Software Engineering}
 \label{sec:engineering}
@@ -601,8 +584,11 @@ I spent quite a lot of time trying to think of workarounds for this problem.
 Eventually, I realized that I shouldn't be trying to vectorize within a Pauli frame simulation.
 Instead, the correct thing to do is to vectorize {\em across multiple} Pauli frame simulations.
 The data layout I decided on was to have 1024 frames packed together into a two dimensional table of bits, with the major axis corresponding to the qubits in the frame and the minor axis (i.e. the contiguous-in-memory axis) corresponding to the different frames being tracked.
-Each gate in the circuit applies a common operation to all of the frames in the table, which is ordered and padded so that this can be done using AVX instructions (e.g. see \fig{pauli_frame_code}).
-Although each gate will still be touching memory in an unpredictable place, the cost of the cache miss is amortized over a thousand parallel frame updates.
+Gates can then be applied to many frames using single instructions.
+For example, an S gate targeting qubit $q$ is performed by xoring $x_q$ into $z_q$, where $x_q$ and $z_q$ are the bits of the xz-encoded Pauli for qubit $q$ in the Pauli frame.
+Instead of individually operating on each $x_q$ and $z_q$ from each frame, there is a 256 bit word containing 256 separate $x_q$ bits from 256 frames, and a 256 bit word containing 256 separate $z_q$ bits from 256 frames, and the S gate is applied to all 256 frames by one \path{_mm256_xor_si256} instruction computing the 256 new $z_q$ values.
+The story is similar for all other gates (e.g. see \fig{pauli_frame_code} for the CNOT gate's code).
+With this approach each gate may still touch memory in an unpredictable way, but the cost of the cache miss will be amortized over a thousand parallel frame updates.
 
 \begin{figure}
     \centering
@@ -965,18 +951,117 @@ After running the benchmarks I noticed that there were outlier times at the smal
 I think this is because the last problem size in each benchmark was large, and so simulating it could for example consume a lot of memory and evict pages that would then fault during the next run (which would be the smallest case in the next benchmark).
 To correct this, I discarded the suspicious data for the three smallest cases from each benchmark and re-ran them on their own.
 
-I chose five benchmarking tasks: sampling a surface code circuit (see \fig{bench-surface}), sampling 1000 shots from a surface code circuit (see \fig{bench-surface-1000}), sampling a Bacon-Shor code circuit (see \fig{bench-bacon}), sampling a randomly generated circuit (see \fig{bench-random}), and sampling multi-level S state distillation (see \fig{bench-distill}).
+I chose five benchmarking tasks: bulk sampling a surface code circuit (see \fig{bench-surface-1000}), sampling a surface code circuit (see \fig{bench-surface}), sampling a Bacon-Shor code circuit (see \fig{bench-bacon}), sampling a randomly generated circuit (see \fig{bench-random}), and sampling multi-level S state distillation (see \fig{bench-distill}).
 See the figure captions for commentary on each benchmark task.
+
+\begin{figure}
+    \centering
+    \resizebox{\linewidth}{!}{
+        \includegraphics{assets/bench-surface.png}
+    }
+    \caption{
+        Delay until first sample on $d \times d \times d$ unrotated surface code memory circuits \cite{horsman2012latticesurgery}.
+        The intention of this benchmark is to highlight simulators that can take advantage of redundant structure in the surface code, such as the abundance of local stabilizers and deterministic measurements.
+        Based on the apparent scaling, it appears that none of the simulators are making much use of the structure of the surface code.
+        Stim scales comparatively well on this benchmark because Stim performs deterministic measurements in worst case linear time instead of quadratic time.
+    }
+    \label{fig:bench-surface}
+\end{figure}
+
+\begin{figure}
+    \centering
+    \resizebox{\linewidth}{!}{
+        \includegraphics{assets/bench-bacon.png}
+    }
+    \caption{
+        Delay until first sample on $d \times d \times d$ Bacon-Shor code memory circuits \cite{bacon2006operator}.
+        The intention of this benchmark is to contrast with the surface code benchmark, in that the Bacon-Shor code also has a lot of structure but doesn't have lots of deterministic measurements.
+        Note how Stim's apparent scaling on this benchmark looks more like the other simulators than it did in the surface code benchmark.
+    }
+    \label{fig:bench-bacon}
+\end{figure}
+
+\begin{figure}
+    \centering
+    \resizebox{\linewidth}{!}{
+        \includegraphics{assets/bench-random.png}
+    }
+    \caption{
+        Delay until first sample on random circuits.
+        The intention of this benchmark is to highlight simulators with good performance in circuits that lack much exploitable structure.
+        Each circuit is made up of $n$ qubits operated on for $n$ layers.
+        Each layer randomly applies an $H$, $S$, or $I$ gate to each qubit, then samples a random pairing of the qubits and applies a CNOT to each pair, then samples 5\% of the qubits to measure in a random basis.
+        At the end of the circuit, every qubit is measured in a random basis.
+        One effect I don't understand here is why Stim appears to be scaling differently from chp.
+    }
+    \label{fig:bench-random}
+\end{figure}
+
+\begin{figure}
+    \centering
+    \resizebox{\linewidth}{!}{
+        \includegraphics{assets/bench-distill.png}
+    }
+    \caption{
+        Delay until first sample on nested 7-to-1 S state distillation circuits \cite{fowler2012surfacecodereview}.
+        The intention of this benchmark is to highlight simulators that do well on circuits made up of nearly independent pieces.
+        For example, with 5 levels of distillation, there are initially 2401 independent pieces (each with 15 qubits) performing identical copies of the 7-to-1 distillation circuit \href{https://algassert.com/quirk\#circuit=\%7B\%22cols\%22\%3A\%5B\%5B\%22H\%22\%2C\%22H\%22\%2C\%22H\%22\%2C\%22H\%22\%2C\%22H\%22\%2C\%22H\%22\%2C\%22H\%22\%2C\%22H\%22\%2C\%22H\%22\%2C\%22H\%22\%2C\%22H\%22\%5D\%2C\%5B\%22Z\%22\%2C\%22Z\%5E\%C2\%BD\%22\%2C\%22Z\%5E\%C2\%BD\%22\%2C\%22Z\%5E\%C2\%BD\%22\%2C\%22Z\%5E\%C2\%BD\%22\%2C\%22Z\%5E\%C2\%BD\%22\%2C\%22Z\%5E\%C2\%BD\%22\%2C\%22Z\%5E\%C2\%BD\%22\%5D\%2C\%5B1\%2C1\%2C1\%2C1\%2C1\%2C1\%2C1\%2C1\%2C1\%2C1\%2C\%22\%E2\%80\%A2\%22\%2C\%22X\%22\%2C\%22X\%22\%2C\%22X\%22\%5D\%2C\%5B1\%2C1\%2C1\%2C1\%2C1\%2C1\%2C1\%2C1\%2C1\%2C\%22\%E2\%80\%A2\%22\%2C1\%2C\%22X\%22\%2C1\%2C\%22X\%22\%2C\%22X\%22\%5D\%2C\%5B1\%2C1\%2C1\%2C1\%2C1\%2C1\%2C1\%2C1\%2C\%22\%E2\%80\%A2\%22\%2C1\%2C1\%2C\%22X\%22\%2C\%22X\%22\%2C1\%2C\%22X\%22\%5D\%2C\%5B\%22\%E2\%80\%A2\%22\%2C1\%2C1\%2C1\%2C1\%2C1\%2C1\%2C1\%2C1\%2C1\%2C1\%2C1\%2C\%22X\%22\%2C\%22X\%22\%2C\%22X\%22\%5D\%2C\%5B1\%2C\%22\%5E\%3DA7\%22\%2C1\%2C1\%2C1\%2C1\%2C1\%2C1\%2C\%22inputA7\%22\%5D\%2C\%5B1\%2C1\%2C1\%2C1\%2C1\%2C1\%2C1\%2C1\%2C\%22H\%22\%2C\%22H\%22\%2C\%22H\%22\%2C\%22H\%22\%2C\%22H\%22\%2C\%22H\%22\%2C\%22H\%22\%5D\%2C\%5B1\%2C\%22Measure\%22\%2C\%22Measure\%22\%2C\%22Measure\%22\%2C\%22Measure\%22\%2C\%22Measure\%22\%2C\%22Measure\%22\%2C\%22Measure\%22\%2C\%22Measure\%22\%2C\%22Measure\%22\%2C\%22Measure\%22\%2C\%22Measure\%22\%2C\%22Measure\%22\%2C\%22Measure\%22\%2C\%22Measure\%22\%5D\%2C\%5B1\%2C\%22inputA7\%22\%2C1\%2C1\%2C1\%2C1\%2C1\%2C1\%2C\%22\%5E\%3DA7\%22\%5D\%2C\%5B1\%2C1\%2C1\%2C1\%2C1\%2C1\%2C1\%2C1\%2C\%22X\%22\%2C\%22X\%22\%2C\%22X\%22\%2C\%22\%E2\%80\%A2\%22\%5D\%2C\%5B\%22Z\%22\%2C1\%2C1\%2C1\%2C1\%2C1\%2C1\%2C1\%2C\%22X\%22\%2C1\%2C\%22X\%22\%2C1\%2C\%22\%E2\%80\%A2\%22\%5D\%2C\%5B\%22Z\%22\%2C1\%2C1\%2C1\%2C1\%2C1\%2C1\%2C1\%2C1\%2C\%22X\%22\%2C\%22X\%22\%2C1\%2C1\%2C\%22\%E2\%80\%A2\%22\%5D\%2C\%5B\%22Z\%22\%2C1\%2C1\%2C1\%2C1\%2C1\%2C1\%2C1\%2C\%22X\%22\%2C\%22X\%22\%2C1\%2C1\%2C1\%2C1\%2C\%22\%E2\%80\%A2\%22\%5D\%2C\%5B1\%2C1\%2C1\%2C1\%2C1\%2C1\%2C1\%2C1\%2C\%22Chance3\%22\%5D\%2C\%5B\%22Bloch\%22\%2C1\%2C1\%2C1\%2C1\%2C1\%2C1\%2C1\%2C\%22\%7C0\%E2\%9F\%A9\%E2\%9F\%A80\%7C\%22\%2C\%22\%7C0\%E2\%9F\%A9\%E2\%9F\%A80\%7C\%22\%2C\%22\%7C0\%E2\%9F\%A9\%E2\%9F\%A80\%7C\%22\%5D\%5D\%7D}{(view in Quirk)}.
+        Then the output qubits from each of these pieces are put into groups of seven and handed along to the next stage, which has 343 independent pieces.
+        This process continues until there is a single output qubit remaining.
+        graphsim does particularly well on this benchmark, due to the connected components of the graph state perfectly matching the independent pieces of the circuit.
+    }
+    \label{fig:bench-distill}
+\end{figure}
 
 Overall, I would say that the benchmarks show that at larger sizes Stim outperforms everything else by one or more orders of magnitude, and that when collecting thousands of samples Stim outperforms everything else by many orders of magnitude.
 A notable exception is the multi-level distillation task, where \path{graphsim} shines due to its ability to simulate piecewise circuits in a piecewise fashion.
 Actually, in most of the benchmarks, there is circuit structure present that should allow a simulator that notices and uses that structure to outperform Stim.
 This would be an interesting avenue for future work.
 
+
+\section{Conclusion}
+\label{sec:conclusion}
+
+In this paper I presented Stim, a fast stabilizer circuit simulator.
+Stim was my attempt at simulating surface code circuits with tens of thousands of qubits and millions of operations in a tenth of a second.
+Although that goal wasn't reached, Stim is regardless a useful piece of software.
+
+I still think it's possible to simulate stabilizer circuits with tens of thousands of qubits and millions of gates in a tenth of a second, at least in special cases.
+For example, when a person analyzes a surface code circuit, they notice the repetitiveness of the low level details of the circuit and zoom out to focus on topological details like lattice surgeries and braids.
+If the stabilizer simulator could do something similar, decent speedups should be possible.
+That is to say, one avenue of attack is to improve the performance of finding and maintaining sparse representations.
+
+Another avenue of attack is to re-examine the assumptions going into the problem being solved.
+The motivating use case I described at the start of the paper was a user making small iterative changes to a large circuit.
+In that context the typical simulation is not a brand new circuit, but rather a slight variation of a circuit from just a moment ago.
+This suggests that work could be cached and reused.
+Alternatively, perhaps as part of creating the circuit, the user has provided information that can be used by the simulator.
+For example, the user may have specified the circuit in terms of repeated pieces or may have noted that a measurement is supposed to relate to previous measurements in a specific way.
+The simulator could verify this information (instead of having to find it) and then exploit it.
+
+Ultimately, I hope the experimental and theoretical sides of the quantum community find Stim to be a useful tool.
+When you can do something ten or a hundred times faster, new and interesting use cases become possible.
+For example, with a fast enough simulator, you could consider brute forcing (or machine learning) the internal minutia of an error correction circuit to minimize undesirable error propagation properties.
+I certainly intend to take advantage of the speed in my own work.
+
+
+\section{Acknowledgements}
+
+I thank Michaels Broughton and Newman for putting up with excessive jokes about {\em brute speed}.
+I thank Michael Broughton for advice and discussions on profiling and optimizing code.
+I thank N. Cody Jones for useful discussions about simulation algorithms, and in particular for pointing out that randomizing the Z frame after resets and measurements was sufficient for sampling from the space of noiseless circuit outputs.
+I thank Hartmut Neven for creating an environment where this work was possible in the first place.
+
+
+\bibliographystyle{plainnat}
+\bibliography{refs}
+
+\appendix
+
 \section{Short Usage Examples}
 \label{sec:example}
 
-\subsection{(Bash) Sample a noisy repetition code 1024 times}
+\subsection{(Command Line) Sample a noisy repetition code 1024 times}
 
 \begin{python}
     echo -e "
@@ -1036,42 +1121,24 @@ This would be an interesting avenue for future work.
     assert should_be_false == False
 \end{python}
 
+\subsection{(Python) Algebraic manipulations}
 
-\section{Conclusion}
-\label{sec:conclusion}
+\begin{python}
+    import stim
 
-In this paper I presented Stim, a fast stabilizer circuit simulator.
-Stim was my attempt at simulating surface code circuits with tens of thousands of qubits and millions of operations in a tenth of a second.
-Although that goal wasn't reached, Stim is regardless a useful piece of software.
+    t = stim.Tableau.random(10)
+    t_inverse = t**-1
+    assert t * t_inverse == stim.Tableau(10)
+    assert (t**1000000) * (t_inverse**500000)**2 == stim.Tableau(10)
 
-I still think it's possible to simulate stabilizer circuits with tens of thousands of qubits and millions of gates in a tenth of a second, at least in special cases.
-For example, when a person analyzes a surface code circuit, they notice the repetitiveness of the low level details of the circuit and zoom out to focus on topological details like lattice surgeries and braids.
-If the stabilizer simulator could do something similar, decent speedups should be possible.
-That is to say, one avenue of attack is to improve the performance of finding and maintaining sparse representations.
-
-Another avenue of attack is to re-examine the assumptions going into the problem being solved.
-The motivating use case I described at the start of the paper was a user making small iterative changes to a large circuit.
-In that context the typical simulation is not a brand new circuit, but rather a slight variation of a circuit from just a moment ago.
-This suggests that work could be cached and reused.
-Alternatively, perhaps as part of creating the circuit, the user has provided information that can be used by the simulator.
-For example, the user may have specified the circuit in terms of repeated pieces or may have noted that a measurement is supposed to relate to previous measurements in a specific way.
-The simulator could verify this information (instead of having to find it) and then exploit it.
-
-Ultimately, I hope the experimental and theoretical sides of the quantum community find Stim to be a useful tool.
-When you can do something ten or a hundred times faster, new and interesting use cases become possible.
-For example, with a fast enough simulator, you could consider brute forcing (or machine learning) the internal minutia of an error correction circuit to minimize undesirable error propagation properties.
-I certainly intend to take advantage of the speed in my own work.
-
-
-\section{Acknowledgements}
-
-I thank Michaels Broughton and Newman for putting up with excessive jokes about {\em brute speed}.
-I thank Michael Broughton for advice and discussions on profiling and optimizing code.
-I thank N. Cody Jones for useful discussions about simulation algorithms, and in particular for pointing out that randomizing the Z frame after resets and measurements was sufficient for sampling from the space of noiseless circuit outputs.
-I thank Hartmut Neven for creating an environment where this work was possible in the first place.
-
-
-\bibliographystyle{plainnat}
-\bibliography{refs}
+    x5: stim.PauliString = t.x_output(5)
+    z6: stim.PauliString = t.z_output(6)
+    assert t_inverse(x5 * z6) == stim.PauliString("+_____XZ___")
+    
+    s = stim.TableauSimulator()
+    s.set_inverse_tableau(t)
+    stabilizers = s.canonical_stabilizers()
+    assert stabilizers[0].commutes(stabilizers[1])
+\end{python}
 
 \end{document}
