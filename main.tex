@@ -153,7 +153,7 @@ It contains magic state injections.
 This obstacle has actually been the subject of a lot of recent work \cite{bravyi2019simulation,bu2019efficient,huang2020feynman,huang2019approximate}.
 I'll be completely ignoring it in this paper.
 
-Sixth, when simulating an error correcting circuit, it's common to sample a circuit millions or even trillions of times.
+Sixth, when simulating an error correcting circuit, it's common to sample the circuit millions or even trillions of times.
 For example, going to large code distances can allow a lone half distance error mechanism to shine through the background haze of full distance errors.
 But logical errors become rare at large code distances, and so many samples have to be taken to see them.
 Based on discussions I've had with co-workers who have done these sorts of large scale simulations \cite{conversationmikeasutin}, the main bottleneck is not decoding the errors but rather (surprisingly) generating the samples.
@@ -188,7 +188,8 @@ In \sec{concepts}, I explain key background concepts that are needed in order to
 Then in \sec{framesim} and \sec{tableausim} I describe the Pauli frame simulator and stabilizer tableau simulators implemented by Stim.
 \sec{engineering} describes several of the software engineering details that went into Stim, such as why I decided to use a dense representation instead of a sparse representation and how I went about testing that operations were implemented correctly.
 Stim's performance is compared to other stabilizer simulators in \sec{compare}.
-Finally, \sec{example} shows a few examples of using Stim and \sec{conclusion} wraps everything up.
+Finally, \sec{conclusion} wraps everything up.
+There are also a few short usage examples in \app{example}.
 
 \section{Key Concepts}
 \label{sec:concepts}
@@ -489,7 +490,7 @@ This forces the measurement under consideration to become deterministic, so it c
 \subsection{The Asymptotic Benefits of Backwards Thinking}
 
 At this point I should note that, in previous work \cite{aaronson2004chp}, this whole process was explained in reverse.
-Instead of being framed in terms of how single qubit observables at the current time mapped to compound observables at the start of time, previous work was framed in terms of single qubit stabilizers and destabilizers at the start of time being mapped to compound stabilizers and destabilizers at the current time.
+Instead of being framed in terms of how single qubit observables at the current time mapped to compound observables at the start of time, previous work was framed in terms of single qubit stabilizers and ``destabilizers" at the start of time being mapped to compound Pauli products at the current time.
 For example, measurements were classified as deterministic or random based on whether or not they anticommuted with any of the current-time stabilizers.
 This is equivalent to checking whether the $Z$ observable mapped backward anticommutes with the initial state for the same reason that inverting a Clifford tableau is nearly a transposition.
 
@@ -508,7 +509,7 @@ Here are the steps used to perform a stabilizer tableau simulation:
 
 \begin{enumerate}
     \item Initialize an identity stabilizer tableau $T$.
-    To aide the intuition, imagine it being positioned at the start of the circuit being simulated.
+    To aide the intuition, imagine it being positioned at the start of the circuit being simulated, just after the qubits have been initialized into the $|0\rangle$ state.
     \item Begin folding circuit operations into $T$, working from earliest to latest.
     \begin{itemize}
         \item To fold a Clifford gate $C$ into $T$, perform an inplace prepend of $C^{-1}$ into $T$ then delete $C$ from the circuit.
@@ -531,7 +532,7 @@ Here are the steps used to perform a stabilizer tableau simulation:
 \end{enumerate}
 
 The asymptotic complexity of this simulation is $O(ng + nd + n^2r)$ where $n$ is the number of qubits, $g$ is the number of gates, $d$ is the number of measurements that have a deterministic result given previous measurements, and $r$ is the number of measurements that have random results.
-(Note: $m$ and $r$ also include contributions from operations such as resets, which implicitly perform a measurement as part of their implementation.)
+(Note: $d$ and $r$ also include contributions from operations such as resets, which implicitly perform a measurement as part of their implementation.)
 This is an improvement over the complexity $O(ng + n^2d + n^2r)$ from previous work.
 
 An example of a context where this improvement provides an asymptotic advantage is simulating a distance $d$ surface code circuit for $d$ rounds.
@@ -648,7 +649,7 @@ Another data layout decision I had to make as part of implementing Stim was whet
 Initially, I decided that for locality reasons each 256 bit word should contain the 128 x bits and 128 z bits from 128 Paulis.
 This is a bad idea.
 It violates a core rule of thumb for writing fast vectorized code: don't mix different data together.
-For example, consider simulating  an $S$ gate.
+For example, consider simulating an $S$ gate (again).
 As part of simulating the $S$ gate, the x bits of a Pauli string have to be xored pairwise into the z bits.
 If the x and z bits are in separate words, you can process the xor part of the $S$ gate for 256 Paulis using one AVX bitwise xor instruction.
 If the x and z bits are in the same word, the xor will have to be accompanied by some shifting and masking and these multiple instructions will have only processed 128 Paulis instead of 256.
@@ -819,9 +820,11 @@ Once an operation's tableau is established as being correct, it can be used to v
 The test code does this by generating several large random tableaus \cite{bravyi2020randomtableau}, and confirming that composing the operation's tableau into the random tableau using a general method gives the same result as applying the hand optimized code.
 Because of the local and discrete nature of tableau operations, this sort of fuzzing is extremely effective at catching bugs.
 
-Finally, there is the risk of simply forgetting to test an operation in the first place.
-To mitigate this, the test code takes advantage of the fact that every supported gate appears in explicit lists and maps used e.g. when parsing circuits.
-Instead of needing a test for each gate, one single test can verify all of the defined gates.
+One important risk factor in testing is the risk of simply forgetting to test an operation in the first place.
+I'd normally use code coverage tools to verify that the tests are exercising everything, but I couldn't get any C++ code coverage tool that I tried to work.
+Instead, the test code takes advantage of the fact that every supported gate appears as data in a list.
+This listed data is used for crucial functionality such as parsing, so I can expect it to be complete.
+With this listed data, one test can verify all of the defined gates.
 For example:
 
 \begin{cpp}
@@ -836,8 +839,9 @@ For example:
 \end{cpp}
 
 Noise channels are harder to test than Cliffords, because the behavior of noise channels isn't deterministic.
-Noise channels are tested by simulating circuits that apply the noise channel to simple states, and performing statistical tests on the output samples which verify consistency against independent definitions of the same noise channel from Cirq \cite{quantum_ai_team_and_collaborators_2020_4062499}.
-The \path{X_ERROR}/\path{Z_ERROR} transposition that I mentioned slipped through these checks because originally this testing only exercised the bulk sampling API (which was a natural choice due to needing many samples), not the single-sample interactive API.
+I tested noise channels by creating tests that sampled circuits applying the noise channel to simple states.
+Then, statistical checks verified the consistency of the samples against independent definitions of noise channels from Cirq \cite{quantum_ai_team_and_collaborators_2020_4062499}.
+The \path{X_ERROR}/\path{Z_ERROR} transposition that I mentioned slipped through these tests because originally they only exercised the bulk sampling API (which was a natural choice due to needing many samples), not the single-sample interactive API.
 
 Tests are run with compiler optimizations enabled, but also run without compilation optimizations with address and memory sanitization checks enabled.
 A continuous integration system verifies that the tests pass before allowing commits to be merged into the main branch.
@@ -1065,7 +1069,7 @@ I thank Hartmut Neven for creating an environment where this work was possible i
 \appendix
 
 \section{Short Usage Examples}
-\label{sec:example}
+\label{app:example}
 
 \subsection{(Command Line) Sample a noisy repetition code 1024 times}
 
