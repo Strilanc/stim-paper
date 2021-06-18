@@ -1100,7 +1100,7 @@ I thank Hartmut Neven for creating an environment where this work was possible i
     c.append_operation("MR", qubits[1::2])
     c *= rounds
     # Collect and print samples.
-    sampler = c.compile()
+    sampler = c.compile_sampler()
     samples = sampler.sample(1024)
     for sample in samples: print(sample)
 \end{python}
