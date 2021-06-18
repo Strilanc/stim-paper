@@ -1,0 +1,61 @@
+// Copyright 2021 Google LLC
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+#include "base.pybind.h"
+
+#include "../probability_util.h"
+
+static bool shared_rng_initialized;
+static std::mt19937_64 shared_rng;
+
+std::mt19937_64 &PYBIND_SHARED_RNG() {
+    if (!shared_rng_initialized) {
+        shared_rng = externally_seeded_rng();
+        shared_rng_initialized = true;
+    }
+    return shared_rng;
+}
+
+std::string clean_doc_string(const char *c) {
+    // Skip leading empty lines.
+    while (*c == '\n') {
+        c++;
+    }
+
+    // Determine indentation using first non-empty line.
+    size_t indent = 0;
+    while (*c == ' ') {
+        indent++;
+        c++;
+    }
+
+    std::string result;
+    while (*c != '\0') {
+        // Skip indentation.
+        for (size_t j = 0; j < indent && *c == ' '; j++) {
+            c++;
+        }
+
+        // Copy rest of line.
+        while (*c != '\0') {
+            result.push_back(*c);
+            c++;
+            if (result.back() == '\n') {
+                break;
+            }
+        }
+    }
+
+    return result;
+}
